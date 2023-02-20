@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
@@ -87,18 +88,41 @@ func scheduledRaces(races []Race) string {
 
 	var countRaces int = len(races)
 	racesList := make([]string, countRaces)
+	formatDateTime(races)
 
 	for _, race := range races {
 		racesList = append(racesList, fmt.Sprintf("Номер этапа: %s,\n Название этапа: %s,\n Дата этапа: %s,\n Время этапа: %s.\n\n",
-			race.Round, race.RaceName, formatDate(race.Date), race.Time))
+			race.Round, race.RaceName, race.Date, race.Time))
 	}
 
 	return strings.Join(racesList, "")
 }
 
-func formatDate(date string) string {
-	partsDate := strings.Split(date, "-")
+func formatDateTime(races []Race) {
 
+	tzone, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	for num, race := range races {
+
+		var tempDateTime time.Time
+
+		tempDateTime, err = time.Parse("2006-01-02 15:04:05Z", fmt.Sprintf("%s %s", race.Date, race.Time))
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		race.Date = ruMonth(tempDateTime.Format("2006-01-02"))
+		race.Time = tempDateTime.In(tzone).Format("15:04")
+		races[num] = race
+	}
+}
+
+func ruMonth(date string) string {
+
+	partsDate := strings.Split(date, "-")
 	for key, value := range months {
 		if key == partsDate[1] {
 			partsDate[1] = value

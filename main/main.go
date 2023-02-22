@@ -52,6 +52,7 @@ func main() {
 		log.Panic(err)
 		os.Exit(1)
 	}
+
 	bh.HandleMessage(func(bot *telego.Bot, message telego.Message) {
 
 		var messageToUser string
@@ -88,7 +89,10 @@ func racesToString(races []Race) string {
 
 	var countRaces int = len(races)
 	racesList := make([]string, countRaces)
-	formatDateTime(races)
+
+	for num, race := range races {
+		races[num] = formatDateTime(race)
+	}
 
 	for _, race := range races {
 		racesList = append(racesList, raceToString(race))

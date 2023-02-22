@@ -98,6 +98,11 @@ func scheduledRaces(races []Race) string {
 	return strings.Join(racesList, "")
 }
 
+func raceToString(race Race) string {
+	return fmt.Sprintf("Номер этапа: %s,\nНазвание этапа: %s,\nДата этапа: %s,\nВремя этапа: %s.\n\n",
+		race.Round, race.RaceName, race.Date, race.Time)
+}
+
 func formatDateTime(races []Race) {
 
 	tzone, err := time.LoadLocation("Europe/Moscow")

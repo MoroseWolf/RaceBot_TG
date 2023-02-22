@@ -102,26 +102,22 @@ func raceToString(race Race) string {
 		race.Round, race.RaceName, race.Date, race.Time)
 }
 
-func formatDateTime(races []Race) {
+func formatDateTime(race Race) Race {
 
 	tzone, err := time.LoadLocation("Europe/Moscow")
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	for num, race := range races {
-
-		var tempDateTime time.Time
-
-		tempDateTime, err = time.Parse("2006-01-02 15:04:05Z", fmt.Sprintf("%s %s", race.Date, race.Time))
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		race.Date = ruMonth(tempDateTime.Format("2006-01-02"))
-		race.Time = tempDateTime.In(tzone).Format("15:04")
-		races[num] = race
+	tempDateTime, err := time.Parse("2006-01-02 15:04:05Z", fmt.Sprintf("%s %s", race.Date, race.Time))
+	if err != nil {
+		log.Fatalln(err)
 	}
+
+	race.Date = ruMonth(tempDateTime.Format("2006-01-02"))
+	race.Time = tempDateTime.In(tzone).Format("15:04")
+
+	return race
 }
 
 func ruMonth(date string) string {

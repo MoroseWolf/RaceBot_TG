@@ -70,7 +70,7 @@ func main() {
 		var races Object
 		json.Unmarshal([]byte(body), &races)
 
-		messageToUser = fmt.Sprintf("Календарь F1 сезона 2023 :\n%s", scheduledRaces(races.MRData.RaceTable.Races))
+		messageToUser = fmt.Sprintf("Календарь F1 сезона 2023 :\n%s", racesToString(races.MRData.RaceTable.Races))
 		_, _ = bot.SendMessage(tu.Messagef(
 			tu.ID(message.Chat.ID),
 			messageToUser,
@@ -84,15 +84,14 @@ func main() {
 	bh.Start()
 }
 
-func scheduledRaces(races []Race) string {
+func racesToString(races []Race) string {
 
 	var countRaces int = len(races)
 	racesList := make([]string, countRaces)
 	formatDateTime(races)
 
 	for _, race := range races {
-		racesList = append(racesList, fmt.Sprintf("Номер этапа: %s,\n Название этапа: %s,\n Дата этапа: %s,\n Время этапа: %s.\n\n",
-			race.Round, race.RaceName, race.Date, race.Time))
+		racesList = append(racesList, raceToString(race))
 	}
 
 	return strings.Join(racesList, "")

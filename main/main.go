@@ -79,6 +79,41 @@ func main() {
 
 	}, th.CommandEqual("showraces"))
 
+	bh.HandleMessage(func(bot *telego.Bot, message telego.Message) {
+
+		var messageToUser string
+
+		resp, err := http.Get("http://ergast.com/api/f1/2023.json")
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		var races Object
+		json.Unmarshal([]byte(body), &races)
+
+		userTime := message.Date
+		//fmt.Println(userTime)
+		isAfter := checkCurrToLastTime(userTime, races.MRData.RaceTable.Races[len(races.MRData.RaceTable.Races)-1])
+
+		if isAfter {
+			messageToUser = "Сезон закончился!"
+		} else {
+			nextRace := findNextRace(userTime, races.MRData.RaceTable.Races)
+			messageToUser = fmt.Sprintf("Cледующий гран-при :\n%s", raceToString(formatDateTime(nextRace)))
+		}
+		_, _ = bot.SendMessage(tu.Messagef(
+			tu.ID(message.Chat.ID),
+			messageToUser,
+		))
+
+	}, th.CommandEqual("nextrace"))
+
 	defer bh.Stop()
 	defer bot.StopLongPolling()
 
@@ -134,4 +169,38 @@ func ruMonth(date string) string {
 	}
 
 	return strings.Join([]string{partsDate[2], partsDate[1], partsDate[0]}, " ")
+}
+
+func checkCurrToLastTime(messageDate int64, race Race) bool {
+	lastRace, err := time.Parse("2006-01-02 15:04:05Z", fmt.Sprintf("%s %s", race.Date, race.Time))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	if messageDate >= int64(lastRace.Unix()) {
+		return true
+	} else {
+		return false
+	}
+}
+
+func findNextRace(messageDate int64, races []Race) Race {
+
+	userDate := time.Unix(messageDate, 0)
+	var numRace int
+
+	for num, race := range races {
+
+		tempDateTime, err := time.Parse("2006-01-02 15:04:05Z", fmt.Sprintf("%s %s", race.Date, race.Time))
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		if tempDateTime.After(userDate) {
+			numRace = num
+			break
+		}
+	}
+
+	return races[numRace]
 }

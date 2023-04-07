@@ -98,14 +98,13 @@ func main() {
 		json.Unmarshal([]byte(body), &races)
 
 		userTime := message.Date
-		//fmt.Println(userTime)
 		isAfter := checkCurrToLastTime(userTime, races.MRData.RaceTable.Races[len(races.MRData.RaceTable.Races)-1])
 
 		if isAfter {
 			messageToUser = "Сезон закончился!"
 		} else {
 			nextRace := findNextRace(userTime, races.MRData.RaceTable.Races)
-			messageToUser = fmt.Sprintf("Cледующий гран-при :\n%s", raceToString(formatDateTime(nextRace)))
+			messageToUser = fmt.Sprintf("Cледующий гран-при :\n%s", raceFullInfoToString(formatDateTime(nextRace)))
 		}
 		_, _ = bot.SendMessage(tu.Messagef(
 			tu.ID(message.Chat.ID),
@@ -113,6 +112,34 @@ func main() {
 		))
 
 	}, th.CommandEqual("nextrace"))
+
+	bh.HandleMessage(func(bot *telego.Bot, message telego.Message) {
+
+		var messageToUser string
+
+		resp, err := http.Get("http://ergast.com/api/f1/2023/driverStandings.json")
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		var object Object
+		json.Unmarshal([]byte(body), &object)
+		driversTable := object.MRData.StandingsTable.StandingsLists[0].DriverStandings
+
+		messageToUser = fmt.Sprintf("Личный зачёт F1, сезон 2023: \n%s", driversToString(driversTable))
+
+		_, _ = bot.SendMessage(tu.Messagef(
+			tu.ID(message.Chat.ID),
+			messageToUser,
+		))
+
+	}, th.CommandEqual("driverstandings"))
 
 	defer bh.Stop()
 	defer bot.StopLongPolling()
@@ -141,6 +168,16 @@ func raceToString(race Race) string {
 		race.Round, race.RaceName, race.Date, race.Time)
 }
 
+func raceFullInfoToString(race Race) string {
+	if len(race.Sprint.Date) > 0 {
+		return fmt.Sprintf("Номер этапа: %s,\nНазвание этапа: %s,\nВремя гонки: %s,\n\nПервая практика: %s,\nВторая практика: %s, \nКвалификация: %s,\nСпринт: %s.\n\n",
+			race.Round, race.RaceName, race.Date+" "+race.Time, race.FirstPractice.Date+" "+race.FirstPractice.Time, race.SecondPractice.Date+" "+race.SecondPractice.Time, race.Qualifying.Date+" "+race.Qualifying.Time, race.Sprint.Date+" "+race.Sprint.Time)
+	} else {
+		return fmt.Sprintf("Номер этапа: %s,\nНазвание этапа: %s,\nВремя гонки: %s,\n\nПервая практика: %s,\nВторая практика: %s, \nТретья практика: %s,\nКвалификация: %s.\n",
+			race.Round, race.RaceName, race.Date+" "+race.Time, race.FirstPractice.Date+" "+race.FirstPractice.Time, race.SecondPractice.Date+" "+race.SecondPractice.Time, race.ThirdPractice.Date+" "+race.ThirdPractice.Time, race.Qualifying.Date+" "+race.Qualifying.Time)
+	}
+}
+
 func formatDateTime(race Race) Race {
 
 	tzone, err := time.LoadLocation("Europe/Moscow")
@@ -148,15 +185,42 @@ func formatDateTime(race Race) Race {
 		log.Fatalln(err)
 	}
 
-	tempDateTime, err := time.Parse("2006-01-02 15:04:05Z", fmt.Sprintf("%s %s", race.Date, race.Time))
+	raceDate := parseStringToTime(race.Date, race.Time)
+	fPracticeDate := parseStringToTime(race.FirstPractice.Date, race.FirstPractice.Time)
+	sPracticeDate := parseStringToTime(race.SecondPractice.Date, race.SecondPractice.Time)
+	qualDate := parseStringToTime(race.Qualifying.Date, race.Qualifying.Time)
+
+	race.Date = ruMonth(raceDate.Format("2006-01-02"))
+	race.Time = raceDate.In(tzone).Format("15:04")
+
+	race.FirstPractice.Date = ruMonth(fPracticeDate.Format("2006-01-02"))
+	race.FirstPractice.Time = fPracticeDate.In(tzone).Format("15:04")
+
+	race.SecondPractice.Date = ruMonth(sPracticeDate.Format("2006-01-02"))
+	race.SecondPractice.Time = sPracticeDate.In(tzone).Format("15:04")
+
+	race.Qualifying.Date = ruMonth(qualDate.Format("2006-01-02"))
+	race.Qualifying.Time = qualDate.In(tzone).Format("15:04")
+
+	if len(race.Sprint.Date) > 0 {
+		sprDate := parseStringToTime(race.Sprint.Date, race.Sprint.Time)
+		race.Sprint.Date = ruMonth(sprDate.Format("2006-01-02"))
+		race.Sprint.Time = sprDate.In(tzone).Format("15:04")
+	} else {
+		tPracticeDate := parseStringToTime(race.ThirdPractice.Date, race.ThirdPractice.Time)
+		race.ThirdPractice.Date = ruMonth(tPracticeDate.Format("2006-01-02"))
+		race.ThirdPractice.Time = tPracticeDate.In(tzone).Format("15:04")
+	}
+
+	return race
+}
+
+func parseStringToTime(dateRace string, timeRace string) time.Time {
+	tempDateTime, err := time.Parse("2006-01-02 15:04:05Z", fmt.Sprintf("%s %s", dateRace, timeRace))
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	race.Date = ruMonth(tempDateTime.Format("2006-01-02"))
-	race.Time = tempDateTime.In(tzone).Format("15:04")
-
-	return race
+	return tempDateTime
 }
 
 func ruMonth(date string) string {
@@ -203,4 +267,22 @@ func findNextRace(messageDate int64, races []Race) Race {
 	}
 
 	return races[numRace]
+}
+
+func driversToString(drivers []DriverStandingsItem) string {
+	var countDrivers int = len(drivers)
+	driversList := make([]string, countDrivers)
+
+	for _, driver := range drivers {
+		driversList = append(driversList, driverToString(driver))
+	}
+
+	return strings.Join(driversList, "")
+}
+
+func driverToString(driver DriverStandingsItem) string {
+	//return fmt.Sprintf("%2s | %3s... | %s \n", driver.PositionText, driver.Driver.Code, driver.Points)
+
+	data := fmt.Sprintln(`` + driver.PositionText + ` | ` + driver.Driver.Code + ` | ` + driver.Points + ``)
+	return data
 }

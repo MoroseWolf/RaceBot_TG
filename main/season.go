@@ -51,6 +51,7 @@ type Race struct {
 	SecondPractice SecondPractice
 	ThirdPractice  ThirdPractice
 	Qualifying     Qualifying
+	Sprint         Sprint
 }
 
 type RaceTable struct {
@@ -59,8 +60,9 @@ type RaceTable struct {
 }
 
 type MRData struct {
-	Series    string
-	RaceTable RaceTable
+	Series         string
+	RaceTable      RaceTable
+	StandingsTable StandingsTable
 }
 
 type Object struct {
